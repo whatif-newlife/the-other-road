@@ -27,6 +27,8 @@ function detectLang(){
   return n.startsWith("ko") ? "ko" : n.startsWith("ja") ? "ja" : n.startsWith("zh") ? "zh" : "ko";
 }
 let LANG = detectLang();
+/* visitor stats: only active on the standalone site where the GoatCounter script is loaded */
+function track(name){ try { if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({path:"event/"+name, title:name, event:true}); } catch(e){} }
 function t(key, vars){
   let s = (UI[LANG] && UI[LANG][key]) ?? UI.ko[key] ?? key;
   if (vars) s = s.replace(/\{(\w+)\}/g, (m,k) => vars[k] != null ? vars[k] : m);
@@ -208,6 +210,7 @@ function newLife(cross){
        rewinds:0, streakW:0, streakL:0, maxWin:0, maxLose:0, minM:stats.m, engine, aiFailed:false, aiError:null,
        npc:{friend:names[0], rival:names[1], lover:names[2], mentorName:pick(SURNAMES)}, startedAt:Date.now()};
   S.scene = firstScene(); pending = null;
+  track(quick ? "start-quick" : "start-full");
   persist();
 }
 function restoreCurrent(){
@@ -384,6 +387,7 @@ function satisfaction(st){ const vk = VALUES[SAVE.char.value] || "h"; return Mat
 const epilogue = (sat, taken) => t(sat>=70 ? "epiHigh" : sat>=45 ? "epiMid" : "epiLow", {taken});
 
 async function finish(){
+  track(S.quick ? "finish-quick" : "finish-full");
   const top = scoreEndings()[0];
   let job = fill(top.en.job), desc = fill(top.en.d), letter = "", ai = false;
   if (S.engine === "ai" && sampleFn && !S.aiFailed) {
@@ -919,7 +923,7 @@ function bindStoryBox(r){
       try { navigator.clipboard.writeText(text).then(() => { $("#story-copied").textContent = t("step2Copied"); }, () => { ta.select(); $("#story-copied").textContent = t("copyBlocked"); }); }
       catch(e){ ta.select(); $("#story-copied").textContent = t("copyBlocked"); } };
     $("#story-copy").onclick = copy;
-    $("#story-dm").addEventListener("click", () => { $("#story-sent-row").hidden = false; });
+    $("#story-dm").addEventListener("click", () => { track("story-dm"); $("#story-sent-row").hidden = false; });
     $("#story-sent").onclick = () => { r.story = {code, at:Date.now()}; persist(); const sb = $("#storybox"); if (sb) sb.outerHTML = storyBox(r); };
   };
 }
@@ -1015,6 +1019,7 @@ async function makeShareCard(r){
 }
 async function openShare(r){
   const box = $("#sharebox"); if (!box) return;
+  track("share-open");
   box.hidden = false;
   box.innerHTML = `<div class="thinking"><i></i><span>${t("shareMaking")}</span></div>`;
   let card;
@@ -1022,12 +1027,13 @@ async function openShare(r){
   box.innerHTML = `<b class="goodtitle">${t("shareTitle")}</b>
     <img class="sharecard" src="${card.url}" alt="${esc(r.job)}">
     <p class="note">${t("shareHint",{ig:STORY_CONTACT})}</p>
-    <div class="row">${downloadsApi ? `<button class="btn" id="share-save">${t("shareSave")}</button>` : !window.claude ? `<a class="btn" download="the-other-road.png" href="${card.url}">${t("shareSave")}</a>` : ""}</div>
+    <div class="row">${downloadsApi ? `<button class="btn" id="share-save">${t("shareSave")}</button>` : !window.claude ? `<a class="btn" id="share-dl" download="the-other-road.png" href="${card.url}">${t("shareSave")}</a>` : ""}</div>
     <p class="note" id="share-note" aria-live="polite">${t("shareLong")}</p>`;
+  const sd = $("#share-dl"); if (sd) sd.addEventListener("click", () => track("share-save"));
   const sv = $("#share-save");
   if (sv) sv.onclick = async () => {
     sv.disabled = true;
-    try { await downloadsApi.save({filename:"the-other-road.png", data:card.blob}); $("#share-note").textContent = t("shareSaved"); }
+    try { await downloadsApi.save({filename:"the-other-road.png", data:card.blob}); track("share-save"); $("#share-note").textContent = t("shareSaved"); }
     catch(e) { $("#share-note").textContent = e && e.code === "declined" ? t("shareLong") : t("shareFail"); }
     sv.disabled = false;
   };
